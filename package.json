@@ -1,24 +1,16 @@
 {
-  "name": "dex-exchange",
+  "name": "riodex",
   "version": "1.0.0",
   "private": true,
-  "workspaces": [
-    "contracts"
-  ],
   "scripts": {
-    "dev": "cd frontend && npm run dev",
-    "build": "cd frontend && npm run build",
-    "contracts:compile": "cd contracts && npm run compile",
-    "contracts:test": "cd contracts && npm run test",
-    "contracts:deploy:local": "cd contracts && npm run node & sleep 3 && npm run deploy:localhost",
-    "contracts:deploy:polygon": "cd contracts && npm run deploy:polygon",
-    "contracts:deploy:bsc": "cd contracts && npm run deploy:bsc",
-    "contracts:deploy:base": "cd contracts && npm run deploy:base",
-    "contracts:deploy:mainnet": "cd contracts && npm run deploy:mainnet",
-    "supabase:start": "supabase start",
-    "supabase:push": "supabase db push",
-    "supabase:functions:deploy": "supabase functions deploy",
-    "clear": "rm -rf node_modules package-lock.json"
+    "dev":   "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend install && npm --prefix frontend run build",
+    "start": "npm --prefix frontend run start",
+    "contracts:compile":       "npm --prefix contracts run compile",
+    "contracts:deploy:local":  "npm --prefix contracts run node",
+    "contracts:deploy:sepolia":"npm --prefix contracts run deploy:sepolia",
+    "contracts:deploy:base":   "npm --prefix contracts run deploy:base",
+    "contracts:deploy:arc":    "npm --prefix contracts run deploy:arc"
   },
   "engines": {
     "node": ">=18.0.0"
