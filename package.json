@@ -1,0 +1,26 @@
+{
+  "name": "dex-exchange",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "contracts"
+  ],
+  "scripts": {
+    "dev": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "contracts:compile": "cd contracts && npm run compile",
+    "contracts:test": "cd contracts && npm run test",
+    "contracts:deploy:local": "cd contracts && npm run node & sleep 3 && npm run deploy:localhost",
+    "contracts:deploy:polygon": "cd contracts && npm run deploy:polygon",
+    "contracts:deploy:bsc": "cd contracts && npm run deploy:bsc",
+    "contracts:deploy:base": "cd contracts && npm run deploy:base",
+    "contracts:deploy:mainnet": "cd contracts && npm run deploy:mainnet",
+    "supabase:start": "supabase start",
+    "supabase:push": "supabase db push",
+    "supabase:functions:deploy": "supabase functions deploy",
+    "clear": "rm -rf node_modules package-lock.json"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

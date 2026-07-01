@@ -1,0 +1,30 @@
+{
+  "name": "dex-contracts",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "compile":          "hardhat compile",
+    "test":             "hardhat test",
+    "deploy:localhost": "hardhat deploy --network localhost",
+    "deploy:sepolia":   "hardhat deploy --network sepolia",
+    "deploy:base":      "hardhat deploy --network baseSepolia",
+    "deploy:arc":       "hardhat deploy --network arcTestnet",
+    "deploy:all":       "hardhat deploy --network sepolia && hardhat deploy --network baseSepolia && hardhat deploy --network arcTestnet",
+    "node":             "hardhat node",
+    "clean":            "hardhat clean",
+    "clear":            "rm -rf node_modules package-lock.json deployments test cache artifacts"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^6.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.0",
+    "@types/node": "^20.0.0",
+    "hardhat": "^2.22.0",
+    "hardhat-deploy": "^0.12.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "4.9.6",
+    "dotenv": "^16.0.0"
+  }
+}
