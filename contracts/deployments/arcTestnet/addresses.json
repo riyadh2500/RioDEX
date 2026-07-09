@@ -1,0 +1,8 @@
+{
+  "network": "arcTestnet",
+  "chainId": 5042002,
+  "factory": "0xf274De14171Ab928A5Ec19928cE35FaD91a42B64",
+  "router": "0xcb0A9835CDf63c84FE80Fcc59d91d7505871c98B",
+  "weth": "0x889D9A5AF83525a2275e41464FAECcCb3337fF60",
+  "tokenFactory": "0xFD296cCDB97C605bfdE514e9810eA05f421DEBc2"
+}

@@ -38,8 +38,8 @@ export default function SwapPage() {
           {[
             { label: 'Smart contracts compiled',          done: true  },
             { label: 'Deploying to Ethereum Sepolia',     done: false },
-            { label: 'Deploying to Base Sepolia',         done: false },
-            { label: 'Deploying to ARC Testnet',          done: false },
+            { label: 'Deploying to Base Sepolia',         done: true  },
+            { label: 'Deploying to ARC Testnet',          done: true  },
             { label: 'Swap interface goes live',          done: false },
           ].map(({ label, done }) => (
             <div key={label} className="flex items-center gap-3">
