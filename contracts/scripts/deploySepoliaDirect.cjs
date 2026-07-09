@@ -3,7 +3,7 @@ const fs   = require('fs')
 const path = require('path')
 
 const RPC   = 'https://eth-sepolia.g.alchemy.com/v2/BbpNv394mOl1_uwH_8c9h7I-9jYZ6b2-'
-const KEY   = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'
+const KEY   = '0xa956f55ce4ad076af920c194f53e241810c1c68c1f39870876d40656f6af97a4'
 const CHAIN = 11155111
 const BASE  = path.join(__dirname, '..', 'artifacts', 'contracts')
 
