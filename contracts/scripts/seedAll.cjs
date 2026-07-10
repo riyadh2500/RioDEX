@@ -95,7 +95,7 @@ async function main() {
   console.log('\n══ Base Sepolia ══')
   {
     const p      = new ethers.JsonRpcProvider('https://base-sepolia.g.alchemy.com/v2/BbpNv394mOl1_uwH_8c9h7I-9jYZ6b2-')
-    const wallet = new ethers.Wallet('0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80', p)
+    const wallet = new ethers.Wallet('0xa956f55ce4ad076af920c194f53e241810c1c68c1f39870876d40656f6af97a4', p)
     const router  = new ethers.Contract('0x54FaF60Ee37D56262f99772427FEca1a8a3645A5', ROUTER, wallet)
     const factory = new ethers.Contract(await router.factory(), FACTORY, p)
     const WETH    = '0x9e892FA6fF95eF10988e3c9Da7c53E5dE105C26a'
@@ -110,7 +110,7 @@ async function main() {
   console.log('\n══ ARC Testnet ══')
   {
     const p      = new ethers.JsonRpcProvider('https://rpc.testnet.arc.network')
-    const wallet = new ethers.Wallet('0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80', p)
+    const wallet = new ethers.Wallet('0xa956f55ce4ad076af920c194f53e241810c1c68c1f39870876d40656f6af97a4', p)
     const router  = new ethers.Contract('0xcb0A9835CDf63c84FE80Fcc59d91d7505871c98B', ROUTER, wallet)
     const factory = new ethers.Contract(await router.factory(), FACTORY, p)
     console.log('Wallet:', wallet.address, '| USDC:', ethers.formatEther(await p.getBalance(wallet.address)))
