@@ -80,8 +80,8 @@ export function useMarketPrices(symbols: string[]) {
     queryKey:        ['marketPrices', ids.sort().join(',')],
     queryFn:         () => fetchPrices(ids),
     enabled:         ids.length > 0,
-    staleTime:       60_000,   // 1 min
-    refetchInterval: 60_000,
+    staleTime:       30_000,   // 30 sec — faster refresh
+    refetchInterval: 30_000,
     retry:           2,
   })
 

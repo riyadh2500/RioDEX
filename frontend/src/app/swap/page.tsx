@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo } from 'react'
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useChainId } from 'wagmi'
 import { toast } from 'sonner'
-import { ArrowUpDown, Info, Loader2, AlertTriangle, Droplets } from 'lucide-react'
+import { ArrowUpDown, Info, Loader2, AlertTriangle, Droplets, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 
 import { useSwapStore }                          from '@/stores/useSwapStore'
@@ -26,6 +26,15 @@ import { isNativeToken, getWETHToken, parseTokenAmount } from '@/config/tokens'
 import { getNetwork, DEFAULT_CHAIN_ID } from '@/config/networks'
 import { Token } from '@/types/token'
 
+// Stable coins always worth $1
+const STABLECOIN_SYMBOLS = new Set(['USDC', 'USDT', 'EURC', 'DAI', 'BUSD', 'USDC.E', 'TUSDC', 'TUSDT'])
+
+function getTokenUSDPrice(symbol: string, prices: Record<string, { usd: number; change24h: number }>): number {
+  const upper = symbol.toUpperCase()
+  if (STABLECOIN_SYMBOLS.has(upper)) return 1
+  return prices[upper]?.usd ?? 0
+}
+
 function resolveAddr(token: Token, chainId: number): `0x${string}` | null {
   if (isNativeToken(token.address)) {
     const weth = getWETHToken(chainId).address
@@ -34,6 +43,7 @@ function resolveAddr(token: Token, chainId: number): `0x${string}` | null {
   return token.address.length >= 10 ? (token.address as `0x${string}`) : null
 }
 
+// ─── Token amount input ────────────────────────────────────────────────────────
 function TokenAmountInput({ label, token, onTokenChange, amount, onAmountChange, readOnly, isLoading, userAddress, usdValue }: {
   label: string; token: Token | null; onTokenChange: (t: Token) => void
   amount: string; onAmountChange?: (v: string) => void
@@ -54,14 +64,17 @@ function TokenAmountInput({ label, token, onTokenChange, amount, onAmountChange,
         <div className="flex-1">
           {isLoading ? (
             <div className="flex h-10 items-center gap-2 text-dex-muted">
-              <Loader2 size={16} className="animate-spin" /><span className="text-lg">…</span>
+              <Loader2 size={16} className="animate-spin" /><span className="text-lg">Calculating…</span>
             </div>
           ) : (
             <input type="number" min="0" value={amount} onChange={(e) => onAmountChange?.(e.target.value)}
               readOnly={readOnly} placeholder="0.0"
               className={cn('w-full bg-transparent text-2xl font-semibold text-dex-text placeholder:text-dex-muted outline-none', readOnly && 'cursor-default')} />
           )}
-          {usdValue !== undefined && usdValue > 0 && <p className="text-xs text-dex-muted">{formatUSD(usdValue)}</p>}
+          {/* Always show USD value when amount exists */}
+          {amount && parseFloat(amount) > 0 && usdValue !== undefined && usdValue > 0 && (
+            <p className="text-xs text-dex-muted mt-0.5">≈ {formatUSD(usdValue)}</p>
+          )}
         </div>
         <TokenSelector selected={token} onChange={onTokenChange} />
       </div>
@@ -69,6 +82,35 @@ function TokenAmountInput({ label, token, onTokenChange, amount, onAmountChange,
   )
 }
 
+// ─── Live price ticker ────────────────────────────────────────────────────────
+function LivePriceTicker({ symbol, price, change24h, isLoading }: {
+  symbol: string; price: number; change24h: number; isLoading: boolean
+}) {
+  const isUp = change24h >= 0
+  return (
+    <div className="flex items-center gap-3 flex-wrap">
+      <div>
+        <div className="flex items-baseline gap-2">
+          <span className="text-3xl font-black text-dex-text">
+            {isLoading ? <span className="animate-pulse text-dex-muted">Loading…</span> : price > 0 ? formatUSD(price) : 'N/A'}
+          </span>
+          {!isLoading && price > 0 && (
+            <span className={cn('flex items-center gap-1 text-sm font-semibold', isUp ? 'text-dex-green' : 'text-dex-red')}>
+              {isUp ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+              {isUp ? '+' : ''}{change24h.toFixed(2)}%
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-dex-muted mt-0.5">
+          {symbol} / USD · Live from CoinGecko
+          {!isLoading && <span className="ml-1 text-dex-green">●</span>}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ─── Main swap page ───────────────────────────────────────────────────────────
 export default function SwapPage() {
   const { address, isConnected } = useAccount()
   const chainId = useChainId() ?? DEFAULT_CHAIN_ID
@@ -88,22 +130,41 @@ export default function SwapPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeChainId])
 
+  // ── Live prices from CoinGecko ──────────────────────────────────────────
   const inSym  = tokenIn?.symbol  ?? 'ETH'
-  const outSym = tokenOut?.symbol ?? 'ETH'
-  const { prices, isLoading: priceLoading } = useMarketPrices([inSym, outSym, network.nativeCurrency.symbol])
-  const nativeSym   = network.nativeCurrency.symbol
-  const nativeUSD   = prices[nativeSym.toUpperCase()]?.usd ?? network.nativeUSDPrice
-  const nativeChg   = prices[nativeSym.toUpperCase()]?.change24h ?? 0
-  const inUSDPrice  = prices[inSym.toUpperCase()]?.usd  ?? nativeUSD
-  const outUSDPrice = prices[outSym.toUpperCase()]?.usd ?? nativeUSD
+  const outSym = tokenOut?.symbol ?? 'USDC'
+  const nativeSym = network.nativeCurrency.symbol
 
-  const { amountOut: quotedOut, amountOutRaw, isLoading: quoteLoading, notDeployed, noLiquidity, error: quoteError } =
+  const { prices, isLoading: priceLoading } = useMarketPrices([inSym, outSym, nativeSym, 'ETH'])
+
+  // Get USD price for each token — stablecoins = $1
+  const nativeUSD   = getTokenUSDPrice(nativeSym, prices) || prices['ETH']?.usd || 0
+  const nativeChg   = prices['ETH']?.change24h ?? 0
+  const inUSDPrice  = getTokenUSDPrice(inSym,  prices)
+  const outUSDPrice = getTokenUSDPrice(outSym, prices)
+
+  // ── Swap quote ─────────────────────────────────────────────────────────
+  const { amountOut: quotedOut, amountOutRaw, isLoading: quoteLoading, noLiquidity, error: quoteError } =
     useSwapQuote(tokenIn, tokenOut, independentField === 'input' ? amountIn : '')
 
   useEffect(() => {
     if (independentField === 'input') setAmountOut(quotedOut ?? '')
   }, [quotedOut, independentField, setAmountOut])
 
+  // ── USD values ─────────────────────────────────────────────────────────
+  const inUSD  = tokenIn  && amountIn  && parseFloat(amountIn)  > 0 ? parseFloat(amountIn)  * inUSDPrice  : undefined
+  const outUSD = tokenOut && amountOut && parseFloat(amountOut) > 0 ? parseFloat(amountOut) * outUSDPrice : undefined
+
+  // ── Implied pool price (how much tokenOut per 1 tokenIn) ───────────────
+  const poolRatio = amountIn && amountOut && parseFloat(amountIn) > 0
+    ? parseFloat(amountOut) / parseFloat(amountIn) : null
+
+  // ── Pool price vs market price comparison ─────────────────────────────
+  const marketRatio = inUSDPrice > 0 && outUSDPrice > 0 ? inUSDPrice / outUSDPrice : null
+  const priceImpact = poolRatio && marketRatio
+    ? ((marketRatio - poolRatio) / marketRatio) * 100 : null
+
+  // ── Approvals ──────────────────────────────────────────────────────────
   const amountInRaw        = tokenIn ? parseTokenAmount(amountIn || '0', tokenIn.decimals) : BigInt(0)
   const needsErc20Approval = !!(tokenIn && !isNativeToken(tokenIn.address) && isDeployed && tokenIn.address.length >= 10)
   const { needsApproval, approve, approveLoading } = useApproval(
@@ -111,12 +172,18 @@ export default function SwapPage() {
     address, router as `0x${string}`, amountInRaw,
   )
 
+  // ── Write swap ─────────────────────────────────────────────────────────
   const { writeContract, data: swapTxHash, isPending: swapPending } = useWriteContract()
   const { isLoading: swapWaiting, isSuccess: swapSuccess } = useWaitForTransactionReceipt({ hash: swapTxHash })
 
   useEffect(() => {
     if (swapSuccess) {
-      toast.success('Swap confirmed!', { description: `${amountIn} ${tokenIn?.symbol} → ${amountOut} ${tokenOut?.symbol}` })
+      const received = amountOut && parseFloat(amountOut) > 0
+        ? `${parseFloat(amountOut).toFixed(6)} ${tokenOut?.symbol}`
+        : tokenOut?.symbol ?? ''
+      toast.success('Swap confirmed!', {
+        description: `Sent ${amountIn} ${tokenIn?.symbol} → Received ${received}`,
+      })
       setAmountIn(''); setAmountOut('')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -127,10 +194,10 @@ export default function SwapPage() {
     const inAddr  = resolveAddr(tokenIn,  chainId)
     const outAddr = resolveAddr(tokenOut, chainId)
     if (!inAddr || !outAddr) { toast.error('WETH not configured for this network'); return }
-    const path        = [inAddr, outAddr] as [`0x${string}`, `0x${string}`]
-    const dl          = getDeadlineTimestamp(deadline)
-    const slipBps     = BigInt(Math.floor(parseFloat(slippage) * 100))
-    const minOut      = amountOutRaw * (BigInt(10000) - slipBps) / BigInt(10000)
+    const path    = [inAddr, outAddr] as [`0x${string}`, `0x${string}`]
+    const dl      = getDeadlineTimestamp(deadline)
+    const slipBps = BigInt(Math.floor(parseFloat(slippage) * 100))
+    const minOut  = amountOutRaw * (BigInt(10000) - slipBps) / BigInt(10000)
     try {
       if (isNativeToken(tokenIn.address)) {
         writeContract({ address: router as `0x${string}`, abi: DEX_ROUTER_ABI, functionName: 'swapExactETHForTokens', args: [minOut, path, address, dl], value: amountInRaw })
@@ -144,11 +211,7 @@ export default function SwapPage() {
     }
   }
 
-  const inUSD      = tokenIn  && amountIn  ? parseFloat(amountIn)  * inUSDPrice  : undefined
-  const outUSD     = tokenOut && amountOut ? parseFloat(amountOut) * outUSDPrice : undefined
-  const priceRatio = amountIn && amountOut && parseFloat(amountIn) > 0
-    ? (parseFloat(amountOut) / parseFloat(amountIn)).toFixed(6) : null
-  const chartData  = useMemo(() => generateMockPriceData(nativeUSD > 0 ? nativeUSD : 1, 30), [nativeUSD])
+  const chartData  = useMemo(() => generateMockPriceData(nativeUSD > 0 ? nativeUSD : 3500, 30), [nativeUSD])
   const isSwapping = swapPending || swapWaiting
 
   function getButtonLabel() {
@@ -161,7 +224,7 @@ export default function SwapPage() {
     if (quoteError)            return 'Quote unavailable'
     if (needsApproval)         return approveLoading ? 'Approving…' : `Approve ${tokenIn.symbol}`
     if (isSwapping)            return 'Swapping…'
-    return 'Swap'
+    return `Swap ${tokenIn.symbol} → ${tokenOut.symbol}`
   }
 
   function handleClick() {
@@ -178,7 +241,7 @@ export default function SwapPage() {
     <div className="mx-auto max-w-7xl px-4 py-10 md:px-6">
       <div className="flex flex-col lg:flex-row gap-8 items-start justify-center">
 
-        {/* Swap card */}
+        {/* ── Swap card ── */}
         <div className="w-full max-w-md">
           <div className="rounded-2xl border border-dex-border bg-dex-surface shadow-card-md overflow-hidden">
             <div className="flex items-center justify-between border-b border-dex-border px-5 py-4">
@@ -187,19 +250,21 @@ export default function SwapPage() {
             </div>
 
             <div className="p-4 space-y-2">
+              {/* Not deployed banner */}
               {isConnected && !isDeployed && (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex gap-3">
                   <AlertTriangle size={15} className="shrink-0 mt-0.5 text-amber-600" />
-                  <div className="text-xs text-amber-700 space-y-1">
-                    <p className="font-semibold">DEX not deployed on {networkName}</p>
-                    <p>Switch to Base Sepolia or ARC Testnet to use swaps. Sepolia coming soon.</p>
-                  </div>
+                  <p className="text-xs text-amber-700">
+                    <strong>{networkName}</strong> — switch to Base Sepolia or ARC Testnet to swap.
+                  </p>
                 </div>
               )}
 
+              {/* You pay */}
               <TokenAmountInput label="You pay" token={tokenIn} onTokenChange={setTokenIn}
                 amount={amountIn} onAmountChange={setAmountIn} userAddress={address} usdValue={inUSD} />
 
+              {/* Switch button */}
               <div className="flex justify-center py-0.5 relative z-10">
                 <button onClick={switchTokens} aria-label="Switch tokens"
                   className="flex h-9 w-9 items-center justify-center rounded-xl border-2 border-dex-surface bg-dex-surface-2 text-dex-muted hover:bg-dex-pink-light hover:text-dex-pink transition-all shadow-card">
@@ -207,38 +272,73 @@ export default function SwapPage() {
                 </button>
               </div>
 
-              <TokenAmountInput label="You receive" token={tokenOut} onTokenChange={setTokenOut}
+              {/* You receive */}
+              <TokenAmountInput label="You receive (estimated)" token={tokenOut} onTokenChange={setTokenOut}
                 amount={amountOut} onAmountChange={setAmountOut} readOnly
                 isLoading={quoteLoading && independentField === 'input'}
                 userAddress={address} usdValue={outUSD} />
 
+              {/* No liquidity */}
               {noLiquidity && tokenIn && tokenOut && (
                 <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 flex gap-3">
                   <Droplets size={15} className="shrink-0 mt-0.5 text-blue-600" />
                   <p className="text-xs text-blue-700">
-                    No pool for <strong>{tokenIn.symbol} / {tokenOut.symbol}</strong> yet.{' '}
+                    No pool for <strong>{tokenIn.symbol}/{tokenOut.symbol}</strong>.{' '}
                     <Link href="/liquidity/add" className="underline font-medium">Add liquidity →</Link>
                   </p>
                 </div>
               )}
 
-              {priceRatio && tokenIn && tokenOut && !noLiquidity && isDeployed && (
-                <div className="rounded-xl bg-dex-surface-2 border border-dex-border px-4 py-3 space-y-1.5 text-xs text-dex-muted">
+              {/* Quote details */}
+              {amountIn && amountOut && parseFloat(amountIn) > 0 && parseFloat(amountOut) > 0 && tokenIn && tokenOut && !noLiquidity && isDeployed && (
+                <div className="rounded-xl bg-dex-surface-2 border border-dex-border px-4 py-3 space-y-1.5 text-xs">
+                  {/* Rate from pool */}
                   <div className="flex justify-between">
-                    <span>Rate</span>
-                    <span className="text-dex-text font-medium">1 {tokenIn.symbol} = {priceRatio} {tokenOut.symbol}</span>
+                    <span className="text-dex-muted">Pool rate</span>
+                    <span className="text-dex-text font-medium">
+                      1 {tokenIn.symbol} = {poolRatio?.toFixed(6)} {tokenOut.symbol}
+                    </span>
+                  </div>
+                  {/* Market rate */}
+                  {marketRatio && (
+                    <div className="flex justify-between">
+                      <span className="text-dex-muted">Market rate</span>
+                      <span className="text-dex-text font-medium">
+                        1 {tokenIn.symbol} = {marketRatio.toFixed(6)} {tokenOut.symbol}
+                      </span>
+                    </div>
+                  )}
+                  {/* Price impact */}
+                  {priceImpact !== null && (
+                    <div className="flex justify-between">
+                      <span className="text-dex-muted flex items-center gap-1">Price impact <Info size={11} /></span>
+                      <span className={cn('font-semibold', priceImpact > 10 ? 'text-dex-red' : priceImpact > 3 ? 'text-amber-500' : 'text-dex-green')}>
+                        {priceImpact.toFixed(2)}%
+                      </span>
+                    </div>
+                  )}
+                  {/* You receive USD */}
+                  {outUSD !== undefined && outUSD > 0 && (
+                    <div className="flex justify-between border-t border-dex-border pt-1.5">
+                      <span className="text-dex-muted font-medium">You receive</span>
+                      <span className="font-bold text-dex-text">
+                        {parseFloat(amountOut).toFixed(6)} {tokenOut.symbol}
+                        <span className="text-dex-muted font-normal ml-1">(≈ {formatUSD(outUSD)})</span>
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-dex-muted">Slippage</span>
+                    <span className={cn('font-medium', parseFloat(slippage) > 5 ? 'text-amber-500' : 'text-dex-text')}>{slippage}%</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="flex items-center gap-1">Slippage <Info size={11} /></span>
-                    <span className={cn('font-medium', parseFloat(slippage) > 1 ? 'text-amber-500' : 'text-dex-text')}>{slippage}%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Fee (0.3%)</span>
-                    <span className="text-dex-text font-medium">{(parseFloat(amountIn) * 0.003).toFixed(6)} {tokenIn.symbol}</span>
+                    <span className="text-dex-muted">Fee (0.3%)</span>
+                    <span className="text-dex-text">{(parseFloat(amountIn) * 0.003).toFixed(6)} {tokenIn.symbol}</span>
                   </div>
                 </div>
               )}
 
+              {/* CTA */}
               <div className="pt-1">
                 {!isConnected ? <ConnectWalletButton fullWidth /> : (
                   <button onClick={handleClick} disabled={disabled}
@@ -259,40 +359,52 @@ export default function SwapPage() {
           </p>
         </div>
 
-        {/* Chart panel */}
-        <div className="w-full max-w-lg">
+        {/* ── Price panel ── */}
+        <div className="w-full max-w-lg space-y-4">
+
+          {/* Live price card */}
           <div className="rounded-2xl border border-dex-border bg-dex-surface shadow-card-md p-5">
-            <div className="mb-4 flex items-start justify-between">
-              <div>
-                <p className="text-xs text-dex-muted mb-1">{inSym} / USD</p>
-                <p className="text-2xl font-bold text-dex-text">
-                  {priceLoading ? '…' : nativeUSD > 0 ? formatUSD(nativeUSD) : 'N/A'}
-                </p>
-                {nativeChg !== 0 && (
-                  <p className="text-sm font-medium" style={{ color: nativeChg >= 0 ? '#059669' : '#DC2626' }}>
-                    {nativeChg >= 0 ? '+' : ''}{nativeChg.toFixed(2)}%{' '}
-                    <span className="text-dex-muted font-normal">24h</span>
-                  </p>
+            <div className="mb-4">
+              <LivePriceTicker
+                symbol="ETH"
+                price={nativeUSD}
+                change24h={nativeChg}
+                isLoading={priceLoading}
+              />
+            </div>
+            <PriceChart data={chartData} height={200} color="#7C3AED" />
+
+            {/* Token prices row */}
+            {(inUSDPrice > 0 || outUSDPrice > 0) && (
+              <div className="mt-4 grid grid-cols-2 gap-3 pt-4 border-t border-dex-border">
+                {tokenIn && inUSDPrice > 0 && (
+                  <div className="rounded-xl bg-dex-surface-2 p-3">
+                    <p className="text-xs text-dex-muted">{tokenIn.symbol} price</p>
+                    <p className="text-sm font-bold text-dex-text mt-0.5">{formatUSD(inUSDPrice)}</p>
+                  </div>
+                )}
+                {tokenOut && outUSDPrice > 0 && (
+                  <div className="rounded-xl bg-dex-surface-2 p-3">
+                    <p className="text-xs text-dex-muted">{tokenOut.symbol} price</p>
+                    <p className="text-sm font-bold text-dex-text mt-0.5">{formatUSD(outUSDPrice)}</p>
+                  </div>
                 )}
               </div>
-              <div className="text-right text-xs text-dex-muted space-y-1">
-                <p>Network: <span className="text-dex-text font-medium">{network.shortName}</span></p>
-                <p>Chain: <span className="text-dex-text font-medium">{chainId}</span></p>
-                <p>Gas: <span className="text-dex-text font-medium">{nativeSym}</span></p>
-              </div>
-            </div>
-            <PriceChart data={chartData} height={220} />
+            )}
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-4">
+
+          {/* Stats */}
+          <div className="grid grid-cols-2 gap-4">
             {[
-              { label: 'Total Liquidity', value: formatCompact(4_800_000) },
-              { label: '7d Volume',       value: formatCompact(8_200_000) },
-              { label: 'Total Pairs',     value: '12' },
-              { label: 'Swap Fee',        value: '0.30%' },
-            ].map(({ label, value }) => (
+              { label: 'ETH Price',   value: priceLoading ? '…' : nativeUSD > 0 ? formatUSD(nativeUSD) : 'N/A' },
+              { label: '24h Change',  value: nativeUSD > 0 ? `${nativeChg >= 0 ? '+' : ''}${nativeChg.toFixed(2)}%` : 'N/A',
+                color: nativeChg >= 0 ? 'text-dex-green' : 'text-dex-red' },
+              { label: 'Network',     value: network.shortName },
+              { label: 'Swap Fee',    value: '0.30%' },
+            ].map(({ label, value, color }) => (
               <div key={label} className="rounded-xl border border-dex-border bg-dex-surface p-4 shadow-card">
                 <p className="text-xs text-dex-muted">{label}</p>
-                <p className="mt-1 text-lg font-bold text-dex-text">{value}</p>
+                <p className={cn('mt-1 text-lg font-bold text-dex-text', color)}>{value}</p>
               </div>
             ))}
           </div>
