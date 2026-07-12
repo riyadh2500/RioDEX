@@ -1,17 +1,14 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
+import { useChainId } from 'wagmi'
 import { Pair } from '@/types/pair'
+import { useOnChainPairs } from './useOnChainPairs'
+import { DEFAULT_CHAIN_ID } from '@/config/networks'
 
-/** Fetches the full pair list from the /api/pairs endpoint */
+/**
+ * Returns all pools for the currently-connected chain.
+ * Reads directly from the on-chain factory — no API/Supabase required.
+ */
 export function useAllPairs() {
-  return useQuery<Pair[]>({
-    queryKey: ['pairs'],
-    queryFn: async () => {
-      const res = await fetch('/api/pairs')
-      if (!res.ok) throw new Error('Failed to fetch pairs')
-      return res.json()
-    },
-    staleTime: 30_000,
-  })
+  return useOnChainPairs()
 }
