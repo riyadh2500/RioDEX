@@ -19,8 +19,8 @@ interface SettingsState {
 }
 
 const DEFAULTS = {
-  slippage: '5.0',
-  slippagePreset: '1.0' as SlippagePreset,
+  slippage: '0.5',
+  slippagePreset: '0.5' as SlippagePreset,
   deadline: 20,
   expertMode: false,
 }

@@ -8,6 +8,9 @@ import { formatTokenAmount } from '@/config/tokens'
 /**
  * For each pair, reads the user's LP balance and derives their
  * share of pool reserves.
+ *
+ * reserve0Raw / reserve1Raw on Pair are always bigint — use them directly,
+ * never wrap in BigInt() which fails when the value is already a bigint.
  */
 export function useLiquidityPositions(
   pairs: Pair[],
@@ -42,9 +45,11 @@ export function useLiquidityPositions(
 
     if (lpBalance === BigInt(0) || totalSupply === BigInt(0)) return
 
-    const share        = Number(lpBalance) / Number(totalSupply)
-    const token0Amount = (BigInt(pair.reserve0Raw) * lpBalance) / totalSupply
-    const token1Amount = (BigInt(pair.reserve1Raw) * lpBalance) / totalSupply
+    const share = Number(lpBalance) / Number(totalSupply)
+
+    // reserve0Raw / reserve1Raw are already bigint — use directly
+    const token0Amount = (pair.reserve0Raw * lpBalance) / totalSupply
+    const token1Amount = (pair.reserve1Raw * lpBalance) / totalSupply
 
     positions.push({
       pair,

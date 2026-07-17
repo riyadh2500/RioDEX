@@ -9,6 +9,7 @@ import { cn, truncate } from '@/lib/utils'
 import {
   ArrowLeftRight,
   Send,
+  Droplets,
   GlassWater,
   Wallet,
   ChevronDown,
@@ -20,9 +21,10 @@ import {
 import NetworkSwitcher from './NetworkSwitcher'
 
 const NAV_LINKS = [
-  { href: '/swap',   label: 'Swap',   icon: ArrowLeftRight },
-  { href: '/send',   label: 'Send',   icon: Send           },
-  { href: '/faucet', label: 'Faucet', icon: GlassWater     },
+  { href: '/swap',          label: 'Swap',          icon: ArrowLeftRight },
+  { href: '/send',          label: 'Send',          icon: Send           },
+  { href: '/liquidity/add', label: 'Add Liquidity', icon: Droplets       },
+  { href: '/faucet',        label: 'Faucet',        icon: GlassWater     },
 ]
 
 export default function Navbar() {

@@ -98,7 +98,15 @@ function RemoveLiquidityInner() {
   )
 
   // Write
-  const { writeContract, data: txHash, isPending: txPending } = useWriteContract()
+  const { writeContract, data: txHash, isPending: txPending } = useWriteContract({
+    mutation: {
+      onError: (err: any) => {
+        toast.error('Transaction failed', {
+          description: err?.shortMessage ?? err?.message ?? 'Transaction rejected or reverted',
+        })
+      },
+    },
+  })
   const { isLoading: txWaiting, isSuccess: txSuccess } = useWaitForTransactionReceipt({ hash: txHash })
 
   useEffect(() => {

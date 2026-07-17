@@ -9,10 +9,12 @@ import { DEFAULT_CHAIN_ID } from '@/config/networks'
 
 function resolveAddr(token: Token, chainId: number): `0x${string}` | null {
   if (isNativeToken(token.address)) {
-    const weth = getWETHToken(chainId).address
-    return weth ? (weth as `0x${string}`) : null
+    const wethToken = getWETHToken(chainId)
+    if (!wethToken.address || wethToken.address.length < 10) return null
+    return wethToken.address as `0x${string}`
   }
-  return token.address.length >= 10 ? (token.address as `0x${string}`) : null
+  if (!token.address || token.address.length < 10) return null
+  return token.address as `0x${string}`
 }
 
 /** Read pair address + reserves for two tokens */

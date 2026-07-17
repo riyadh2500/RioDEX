@@ -21,7 +21,6 @@ const ethereumSepolia: NetworkConfig = {
 }
 
 // ─── Base Sepolia ─────────────────────────────────────────────────────────────
-// https://docs.base.org/chain/network-information
 const baseSepolia: NetworkConfig = {
   chainId:     84532,
   name:        'Base Sepolia',
@@ -41,32 +40,10 @@ const baseSepolia: NetworkConfig = {
   nativeCoinGeckoId: 'ethereum',
 }
 
-// ─── ARC Testnet (Circle) — native gas = USDC ─────────────────────────────────
-// https://docs.arc.network/arc/references/connect-to-arc
-const arcTestnet: NetworkConfig = {
-  chainId:     5042002,
-  name:        'ARC Testnet',
-  shortName:   'ARC',
-  rpcUrl:      process.env.NEXT_PUBLIC_RPC_ARC_TESTNET ?? 'https://rpc.testnet.arc.network',
-  explorerUrl: 'https://testnet.arcscan.app',
-  logoUrl:     '/tokens/arc.svg',
-  nativeCurrency: { name: 'USD Coin', symbol: 'USDC', decimals: 6 },
-  contracts: {
-    factory:      process.env.NEXT_PUBLIC_FACTORY_ARC_TESTNET       ?? '',
-    router:       process.env.NEXT_PUBLIC_ROUTER_ARC_TESTNET        ?? '',
-    tokenFactory: process.env.NEXT_PUBLIC_TOKEN_FACTORY_ARC_TESTNET ?? '',
-    weth:         process.env.NEXT_PUBLIC_WETH_ARC_TESTNET          ?? '',
-  },
-  nativeUSDPrice:    1,
-  testnet:           true,
-  nativeCoinGeckoId: 'usd-coin',
-}
-
 // ─── Registry ─────────────────────────────────────────────────────────────────
 export const NETWORKS: Record<number, NetworkConfig> = {
   11155111: ethereumSepolia,
   84532:    baseSepolia,
-  5042002:  arcTestnet,
 }
 
 export const DEFAULT_CHAIN_ID = 11155111
@@ -84,7 +61,7 @@ export function getContracts(chainId: number) {
 }
 
 export function getAllNetworks(): NetworkConfig[] {
-  return [NETWORKS[11155111], NETWORKS[84532], NETWORKS[5042002]]
+  return [NETWORKS[11155111], NETWORKS[84532]]
 }
 
 export default NETWORKS

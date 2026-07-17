@@ -24,10 +24,8 @@ import { DEX_ROUTER_ABI } from '@/lib/abis'
 import { cn } from '@/lib/utils'
 import {
   isNativeToken,
-  getWETHToken,
   parseTokenAmount,
   formatTokenAmount,
-  formatUSD,
 } from '@/config/tokens'
 import { DEFAULT_CHAIN_ID, getNetwork } from '@/config/networks'
 
@@ -138,7 +136,15 @@ function AddLiquidityInner() {
   )
 
   // Write
-  const { writeContract, data: txHash, isPending: txPending } = useWriteContract()
+  const { writeContract, data: txHash, isPending: txPending } = useWriteContract({
+    mutation: {
+      onError: (err: any) => {
+        toast.error('Transaction failed', {
+          description: err?.shortMessage ?? err?.message ?? 'Transaction rejected or reverted',
+        })
+      },
+    },
+  })
   const { isLoading: txWaiting, isSuccess: txSuccess } = useWaitForTransactionReceipt({ hash: txHash })
 
   useEffect(() => {
@@ -156,17 +162,32 @@ function AddLiquidityInner() {
     const deadlineTs = getDeadlineTimestamp(deadline)
 
     if (isNativeA || isNativeB) {
-      const token   = isNativeA ? tokenB! : tokenA!
-      const amtTok  = isNativeA ? amountBRaw : amountARaw
-      const amtETH  = isNativeA ? amountARaw : amountBRaw
-      const minTok  = isNativeA ? amountBMin : amountAMin
-      const minETH  = isNativeA ? amountAMin : amountBMin
+      // Identify which token is ERC-20 and which side is native ETH
+      const erc20Token = isNativeA ? tokenB! : tokenA!
+      const amtTok     = isNativeA ? amountBRaw : amountARaw
+      const amtETH     = isNativeA ? amountARaw : amountBRaw
+      const minTok     = isNativeA ? amountBMin : amountAMin
+      const minETH     = isNativeA ? amountAMin : amountBMin
+
+      // erc20Token.address must be a real ERC-20 address, never 'native'
+      if (erc20Token.address === 'native' || erc20Token.address.length < 10) {
+        toast.error('Invalid token address')
+        return
+      }
+
       writeContract({
         address:      router as `0x${string}`,
         abi:          DEX_ROUTER_ABI,
         functionName: 'addLiquidityETH',
-        args:         [token.address as `0x${string}`, amtTok, minTok, minETH, address, deadlineTs],
-        value:        amtETH,
+        args:         [
+          erc20Token.address as `0x${string}`,
+          amtTok,
+          minTok,
+          minETH,
+          address,
+          deadlineTs,
+        ],
+        value: amtETH,
       })
     } else {
       writeContract({
@@ -268,7 +289,7 @@ function AddLiquidityInner() {
               <p className="text-xs font-medium text-dex-muted uppercase tracking-wide">Pool info</p>
               <div className="space-y-1.5">
                 <div className="flex justify-between text-xs">
-                  <span className="text-dex-muted">{tokenA.symbol} per {tokenB.symbol}</span>
+                  <span className="text-dex-muted">{tokenB.symbol} per {tokenA.symbol}</span>
                   <span className="font-medium text-dex-text">
                     {amountB && amountA && parseFloat(amountA) > 0
                       ? (parseFloat(amountB) / parseFloat(amountA)).toFixed(6)
@@ -276,7 +297,7 @@ function AddLiquidityInner() {
                   </span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-dex-muted">{tokenB.symbol} per {tokenA.symbol}</span>
+                  <span className="text-dex-muted">{tokenA.symbol} per {tokenB.symbol}</span>
                   <span className="font-medium text-dex-text">
                     {amountA && amountB && parseFloat(amountB) > 0
                       ? (parseFloat(amountA) / parseFloat(amountB)).toFixed(6)

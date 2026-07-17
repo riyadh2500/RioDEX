@@ -6,7 +6,7 @@ export interface Pair {
   token1: Token
   reserve0: string         // human-readable
   reserve1: string
-  reserve0Raw: bigint
+  reserve0Raw: bigint      // raw on-chain value (always bigint)
   reserve1Raw: bigint
   totalSupply: string      // LP token total supply (human-readable)
   // Derived metrics
