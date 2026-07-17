@@ -153,11 +153,11 @@ export default function SwapPage() {
   const getAllTokens  = useTokenListStore((s) => s.getAllTokens)
   const storeChainId = useTokenListStore((s) => s.chainId)
   useEffect(() => {
-    const list   = getAllTokens()
+    const list   = getAllTokens(chainId)
     const native = list.find((t) => t.address === 'native') ?? list[0] ?? null
     resetForChain(native)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storeChainId])
+  }, [chainId])
 
   // ── Prices ─────────────────────────────────────────────────────────────
   const inSym     = tokenIn?.symbol  ?? 'ETH'

@@ -52,12 +52,12 @@ export default function TokenSelector({ selected, onChange, disabled, label }: T
   const setChainId   = useTokenListStore((s) => s.setChainId)
   const customTokens = useTokenListStore((s) => s.customTokens)
 
-  // Sync store chainId with wagmi chainId
+  // Sync store chainId with wagmi chainId whenever it changes
   useEffect(() => {
     setChainId(liveChainId)
   }, [liveChainId, setChainId])
 
-  // Always derive tokens directly from the registry — never trust the API
+  // Always derive tokens from liveChainId — never from persisted store chainId
   const tokens = useMemo(() => {
     const fresh  = getTestnetTokens(liveChainId)
     const custom = customTokens.filter((t) => t.chainId === liveChainId)

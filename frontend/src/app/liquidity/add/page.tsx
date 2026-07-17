@@ -83,7 +83,7 @@ function AddLiquidityInner() {
 
   // Pre-fill from URL params
   const getAllTokens = useTokenListStore((s) => s.getAllTokens)
-  const allTokens   = useMemo(() => getAllTokens(), [getAllTokens])
+  const allTokens   = useMemo(() => getAllTokens(chainId), [getAllTokens, chainId])
 
   const [tokenA, setTokenA] = useState<Token | null>(null)
   const [tokenB, setTokenB] = useState<Token | null>(null)
@@ -97,19 +97,28 @@ function AddLiquidityInner() {
     if (tB) setTokenB(allTokens.find((t) => t.address.toLowerCase() === tB.toLowerCase()) ?? null)
   }, [params, allTokens])
 
-  // Reserves
+  // Reserves — also check for loading state
   const {
     reserve0, reserve1, pairExists, totalSupply, isLoading: reservesLoading,
   } = usePairReserves(tokenA, tokenB)
 
-  // Auto-quote tokenB amount based on tokenA input
+  // Auto-quote tokenB amount based on tokenA input when pool exists
   useEffect(() => {
     const ZERO = BigInt(0)
-    if (!amountA || !pairExists || reserve0 === ZERO || reserve1 === ZERO || !tokenA || !tokenB) return
+    if (!amountA || parseFloat(amountA) <= 0) return
+    if (!pairExists || reserve0 === ZERO || reserve1 === ZERO) return
+    if (!tokenA || !tokenB) return
     const rawA = parseTokenAmount(amountA, tokenA.decimals)
+    if (rawA === ZERO) return
     const rawB = (rawA * reserve1) / reserve0
     setAmountB(formatTokenAmount(rawB, tokenB.decimals))
   }, [amountA, reserve0, reserve1, pairExists, tokenA, tokenB])
+
+  // Also re-run auto-quote when tokenA changes
+  useEffect(() => {
+    if (!tokenA || !amountA) return
+    setAmountB('')
+  }, [tokenA])
 
   const amountARaw  = tokenA ? parseTokenAmount(amountA || '0', tokenA.decimals) : BigInt(0)
   const amountBRaw  = tokenB ? parseTokenAmount(amountB || '0', tokenB.decimals) : BigInt(0)
@@ -214,12 +223,14 @@ function AddLiquidityInner() {
   const isSubmitting   = txPending || txWaiting
 
   function getButtonState(): { label: string; action: () => void; disabled: boolean; variant: 'pink' | 'amber' | 'muted' } {
-    if (!isConnected)        return { label: 'Connect Wallet', action: () => {}, disabled: true, variant: 'muted' }
-    if (!tokenA || !tokenB)  return { label: 'Select tokens', action: () => {}, disabled: true, variant: 'muted' }
-    if (!amountA || !amountB) return { label: 'Enter amounts', action: () => {}, disabled: true, variant: 'muted' }
-    if (needsApprovalA)       return { label: approvalA.approveLoading ? 'Approving…' : `Approve ${tokenA.symbol}`, action: approvalA.approve, disabled: approvalA.approveLoading, variant: 'amber' }
-    if (needsApprovalB)       return { label: approvalB.approveLoading ? 'Approving…' : `Approve ${tokenB.symbol}`, action: approvalB.approve, disabled: approvalB.approveLoading, variant: 'amber' }
-    if (isSubmitting)         return { label: 'Adding Liquidity…', action: () => {}, disabled: true, variant: 'muted' }
+    if (!isConnected)             return { label: 'Connect Wallet',      action: () => {}, disabled: true,  variant: 'muted' }
+    if (!tokenA || !tokenB)       return { label: 'Select tokens',       action: () => {}, disabled: true,  variant: 'muted' }
+    if (reservesLoading)          return { label: 'Loading pool…',       action: () => {}, disabled: true,  variant: 'muted' }
+    if (!amountA)                 return { label: 'Enter Token A amount', action: () => {}, disabled: true,  variant: 'muted' }
+    if (!amountB)                 return { label: 'Enter Token B amount', action: () => {}, disabled: true,  variant: 'muted' }
+    if (needsApprovalA)           return { label: approvalA.approveLoading ? 'Approving…' : `Approve ${tokenA.symbol}`, action: approvalA.approve, disabled: approvalA.approveLoading, variant: 'amber' }
+    if (needsApprovalB)           return { label: approvalB.approveLoading ? 'Approving…' : `Approve ${tokenB.symbol}`, action: approvalB.approve, disabled: approvalB.approveLoading, variant: 'amber' }
+    if (isSubmitting)             return { label: 'Adding Liquidity…',   action: () => {}, disabled: true,  variant: 'muted' }
     return { label: 'Add Liquidity', action: handleAdd, disabled: false, variant: 'pink' }
   }
 
@@ -248,14 +259,22 @@ function AddLiquidityInner() {
         </div>
 
         <div className="p-4 space-y-3">
-          {/* First token is new pair notice */}
-          {!pairExists && tokenA && tokenB && (
+          {/* New pool notice — only show when NOT loading */}
+          {!reservesLoading && !pairExists && tokenA && tokenB && (
             <div className="flex gap-2 rounded-xl bg-blue-50 border border-blue-100 px-4 py-3 text-xs text-blue-700">
               <Info size={14} className="shrink-0 mt-0.5" />
               <span>
                 You are creating a <strong>new pool</strong>. The ratio of tokens you provide sets the initial price.
                 Make sure you are comfortable with this before proceeding.
               </span>
+            </div>
+          )}
+
+          {/* Loading reserves */}
+          {reservesLoading && tokenA && tokenB && (
+            <div className="flex gap-2 rounded-xl bg-dex-surface-2 border border-dex-border px-4 py-3 text-xs text-dex-muted">
+              <Loader2 size={14} className="shrink-0 mt-0.5 animate-spin" />
+              <span>Checking pool…</span>
             </div>
           )}
 
