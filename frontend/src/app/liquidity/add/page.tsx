@@ -32,7 +32,7 @@ import { DEFAULT_CHAIN_ID, getNetwork } from '@/config/networks'
 const STABLECOINS = new Set(['USDC', 'USDT', 'EURC', 'DAI'])
 
 function AmountInput({
-  label, token, onTokenChange, amount, onAmountChange, userAddress, readOnly,
+  label, token, onTokenChange, amount, onAmountChange, userAddress,
 }: {
   label: string
   token: Token | null
@@ -40,16 +40,15 @@ function AmountInput({
   amount: string
   onAmountChange: (v: string) => void
   userAddress: `0x${string}` | undefined
-  readOnly?: boolean
 }) {
-  const { balance, isLoading: balLoading } = useTokenBalance(token, userAddress)
+  const { balance } = useTokenBalance(token, userAddress)
   return (
     <div className="rounded-xl border border-dex-border bg-dex-surface-2 p-4 space-y-2">
       <div className="flex justify-between">
         <span className="text-xs font-medium text-dex-muted">{label}</span>
         {userAddress && token && (
           <button
-            onClick={() => onAmountChange(balance === '…' ? '' : balance)}
+            onClick={() => onAmountChange(balance)}
             className="text-xs text-dex-pink hover:underline"
           >
             Balance: {balance}
@@ -57,24 +56,14 @@ function AmountInput({
         )}
       </div>
       <div className="flex items-center gap-3">
-        {readOnly ? (
-          <div className="flex-1 flex items-center h-10">
-            {amount ? (
-              <span className="text-2xl font-semibold text-dex-text">{amount}</span>
-            ) : (
-              <Loader2 size={18} className="animate-spin text-dex-muted" />
-            )}
-          </div>
-        ) : (
-          <input
-            type="number"
-            min="0"
-            value={amount}
-            onChange={(e) => onAmountChange(e.target.value)}
-            placeholder="0.0"
-            className="flex-1 bg-transparent text-2xl font-semibold text-dex-text placeholder:text-dex-muted outline-none"
-          />
-        )}
+        <input
+          type="number"
+          min="0"
+          value={amount}
+          onChange={(e) => onAmountChange(e.target.value)}
+          placeholder="0.0"
+          className="flex-1 bg-transparent text-2xl font-semibold text-dex-text placeholder:text-dex-muted outline-none"
+        />
         <TokenSelector selected={token} onChange={onTokenChange} />
       </div>
     </div>
@@ -312,15 +301,14 @@ function AddLiquidityInner() {
             </div>
           </div>
 
-          {/* Token B — auto-filled from pool ratio or market price */}
+          {/* Token B — auto-filled from pool ratio, but editable */}
           <AmountInput
-            label="Token B (auto-filled from pool ratio)"
+            label={pairExists ? 'Token B (auto-filled from pool ratio)' : 'Token B'}
             token={tokenB}
             onTokenChange={setTokenB}
             amount={amountB}
             onAmountChange={setAmountB}
             userAddress={address}
-            readOnly={pairExists}
           />
 
           {/* Pool info */}

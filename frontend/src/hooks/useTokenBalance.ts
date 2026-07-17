@@ -8,19 +8,23 @@ import { Token } from '@/types/token'
 export function useTokenBalance(token: Token | null, address: `0x${string}` | undefined) {
   const isNative = token ? isNativeToken(token.address) : false
 
-  const { data: ethBalance, isLoading: ethLoading } = useBalance({
+  const { data: ethBalance } = useBalance({
     address,
-    query: { enabled: !!address && isNative, staleTime: 10_000 },
+    query: {
+      enabled:   !!address && isNative,
+      staleTime: 15_000,
+      // No refetchInterval — only refetch when window focuses or manually triggered
+    },
   })
 
-  const { data: erc20Balance, isLoading: erc20Loading } = useReadContract({
+  const { data: erc20Balance } = useReadContract({
     address:      token?.address as `0x${string}`,
     abi:          ERC20_ABI,
     functionName: 'balanceOf',
     args:         address ? [address] : undefined,
-    query:        {
+    query: {
       enabled:   !!address && !!token && !isNative && !!token.address && token.address.length >= 10,
-      staleTime: 10_000,
+      staleTime: 15_000,
     },
   })
 
@@ -33,16 +37,16 @@ export function useTokenBalance(token: Token | null, address: `0x${string}` | un
   if (isNative) {
     const raw = ethBalance?.value ?? ZERO
     return {
-      balance:    ethLoading ? '…' : formatTokenAmount(raw, token.decimals),
+      balance:    formatTokenAmount(raw, token.decimals),
       balanceRaw: raw,
-      isLoading:  ethLoading,
+      isLoading:  false,
     }
   }
 
   const raw = (erc20Balance as bigint | undefined) ?? ZERO
   return {
-    balance:    erc20Loading ? '…' : formatTokenAmount(raw, token.decimals),
+    balance:    formatTokenAmount(raw, token.decimals),
     balanceRaw: raw,
-    isLoading:  erc20Loading,
+    isLoading:  false,
   }
 }
