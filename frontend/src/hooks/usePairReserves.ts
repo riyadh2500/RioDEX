@@ -1,6 +1,6 @@
 'use client'
 
-import { useReadContracts, useChainId } from 'wagmi'
+import { useReadContract, useChainId } from 'wagmi'
 import { DEX_FACTORY_ABI, DEX_PAIR_ABI } from '@/lib/abis'
 import { useContractAddresses } from './useContractAddresses'
 import { isNativeToken, getWETHToken, formatTokenAmount } from '@/config/tokens'
@@ -9,81 +9,100 @@ import { DEFAULT_CHAIN_ID } from '@/config/networks'
 
 function resolveAddr(token: Token, chainId: number): `0x${string}` | null {
   if (isNativeToken(token.address)) {
-    const wethToken = getWETHToken(chainId)
-    if (!wethToken.address || wethToken.address.length < 10) return null
-    return wethToken.address as `0x${string}`
+    const weth = getWETHToken(chainId).address
+    if (!weth || weth.length < 10) return null
+    return weth as `0x${string}`
   }
   if (!token.address || token.address.length < 10) return null
   return token.address as `0x${string}`
 }
 
-/** Read pair address + reserves for two tokens */
+/**
+ * Read pair address + reserves for two tokens.
+ * Uses individual useReadContract calls (not batched) to avoid
+ * wagmi's multicall batching delay that causes stale pairExists=false.
+ */
 export function usePairReserves(tokenA: Token | null, tokenB: Token | null) {
-  const chainId              = useChainId() ?? DEFAULT_CHAIN_ID
-  const { factory, isDeployed } = useContractAddresses()
+  const chainId                  = useChainId() ?? DEFAULT_CHAIN_ID
+  const { factory, isDeployed }  = useContractAddresses()
 
   const ZERO = BigInt(0)
 
-  const addrA = tokenA ? resolveAddr(tokenA, chainId) : null
-  const addrB = tokenB ? resolveAddr(tokenB, chainId) : null
-  const enabled = isDeployed && !!addrA && !!addrB
+  const addrA   = tokenA ? resolveAddr(tokenA, chainId) : null
+  const addrB   = tokenB ? resolveAddr(tokenB, chainId) : null
+  const enabled = isDeployed && !!factory && !!addrA && !!addrB
 
-  const { data, isLoading } = useReadContracts({
-    contracts: enabled ? [
-      {
-        address:      factory as `0x${string}`,
-        abi:          DEX_FACTORY_ABI,
-        functionName: 'getPair',
-        args:         [addrA!, addrB!],
-      },
-    ] : [],
-    query: { enabled },
+  // Step 1 — get pair address
+  const { data: pairAddrData, isLoading: pairAddrLoading } = useReadContract({
+    address:      factory as `0x${string}`,
+    abi:          DEX_FACTORY_ABI,
+    functionName: 'getPair',
+    args:         enabled ? [addrA!, addrB!] : undefined,
+    query:        { enabled, staleTime: 10_000 },
   })
 
-  const pairAddress = data?.[0]?.result as `0x${string}` | undefined
-  const pairExists  =
-    !!pairAddress && pairAddress !== '0x0000000000000000000000000000000000000000'
+  const pairAddress = pairAddrData as `0x${string}` | undefined
+  const pairExists  = !!pairAddress &&
+    pairAddress !== '0x0000000000000000000000000000000000000000'
 
-  const { data: pairData, isLoading: pairLoading } = useReadContracts({
-    contracts: pairExists ? [
-      { address: pairAddress!, abi: DEX_PAIR_ABI, functionName: 'getReserves'  },
-      { address: pairAddress!, abi: DEX_PAIR_ABI, functionName: 'token0'       },
-      { address: pairAddress!, abi: DEX_PAIR_ABI, functionName: 'totalSupply'  },
-    ] : [],
-    query: { enabled: pairExists },
+  // Step 2 — get reserves (only when pair exists)
+  const { data: reservesData, isLoading: reservesLoading } = useReadContract({
+    address:      pairAddress,
+    abi:          DEX_PAIR_ABI,
+    functionName: 'getReserves',
+    query:        { enabled: pairExists, staleTime: 10_000 },
   })
 
-  if (!pairExists || !pairData) {
+  // Step 3 — get token0 to determine reserve order
+  const { data: token0Data, isLoading: token0Loading } = useReadContract({
+    address:      pairAddress,
+    abi:          DEX_PAIR_ABI,
+    functionName: 'token0',
+    query:        { enabled: pairExists, staleTime: 60_000 },
+  })
+
+  // Step 4 — get totalSupply
+  const { data: totalSupplyData, isLoading: tsLoading } = useReadContract({
+    address:      pairAddress,
+    abi:          DEX_PAIR_ABI,
+    functionName: 'totalSupply',
+    query:        { enabled: pairExists, staleTime: 10_000 },
+  })
+
+  const isLoading = pairAddrLoading || reservesLoading || token0Loading || tsLoading
+
+  if (!pairExists || !reservesData) {
     return {
-      pairAddress:       null,
+      pairAddress:       null as `0x${string}` | null,
       reserve0:          ZERO,
       reserve1:          ZERO,
       reserve0Formatted: '0',
       reserve1Formatted: '0',
       totalSupply:       ZERO,
-      isLoading:         isLoading || pairLoading,
+      isLoading,
       pairExists:        false,
     }
   }
 
   const [reserve0Raw, reserve1Raw] =
-    (pairData[0]?.result as [bigint, bigint, number]) ?? [ZERO, ZERO, 0]
-  const token0Addr  = pairData[1]?.result as `0x${string}`
-  const totalSupply = (pairData[2]?.result as bigint) ?? ZERO
+    (reservesData as [bigint, bigint, number]) ?? [ZERO, ZERO, 0]
+  const token0Addr  = token0Data as `0x${string}` | undefined
+  const totalSupply = (totalSupplyData as bigint | undefined) ?? ZERO
 
+  // Sort reserves to match tokenA/tokenB order
   const [reserveA, reserveB] =
-    addrA!.toLowerCase() === token0Addr?.toLowerCase()
+    token0Addr && addrA && addrA.toLowerCase() === token0Addr.toLowerCase()
       ? [reserve0Raw, reserve1Raw]
       : [reserve1Raw, reserve0Raw]
 
   return {
-    pairAddress,
+    pairAddress:       pairAddress as `0x${string}`,
     reserve0:          reserveA,
     reserve1:          reserveB,
     reserve0Formatted: tokenA ? formatTokenAmount(reserveA, tokenA.decimals) : '0',
     reserve1Formatted: tokenB ? formatTokenAmount(reserveB, tokenB.decimals) : '0',
     totalSupply,
-    isLoading:         isLoading || pairLoading,
+    isLoading,
     pairExists:        true,
   }
 }

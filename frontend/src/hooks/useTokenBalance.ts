@@ -1,20 +1,19 @@
 'use client'
 
-import { useBalance, useReadContract } from 'wagmi'
+import { useBalance, useReadContract, useChainId } from 'wagmi'
 import { ERC20_ABI } from '@/lib/abis'
 import { isNativeToken, formatTokenAmount } from '@/config/tokens'
 import { Token } from '@/types/token'
+import { DEFAULT_CHAIN_ID } from '@/config/networks'
 
-/**
- * Returns the formatted balance of `token` for `address`.
- * Handles both native ETH and ERC-20 tokens.
- */
 export function useTokenBalance(token: Token | null, address: `0x${string}` | undefined) {
+  const chainId  = useChainId() ?? DEFAULT_CHAIN_ID
   const isNative = token ? isNativeToken(token.address) : false
 
   const { data: ethBalance, isLoading: ethLoading } = useBalance({
     address,
-    query: { enabled: !!address && isNative },
+    chainId,
+    query: { enabled: !!address && isNative, staleTime: 10_000 },
   })
 
   const { data: erc20Balance, isLoading: erc20Loading } = useReadContract({
@@ -22,7 +21,10 @@ export function useTokenBalance(token: Token | null, address: `0x${string}` | un
     abi:          ERC20_ABI,
     functionName: 'balanceOf',
     args:         address ? [address] : undefined,
-    query:        { enabled: !!address && !!token && !isNative },
+    query:        {
+      enabled:   !!address && !!token && !isNative && !!token.address && token.address.length >= 10,
+      staleTime: 10_000,
+    },
   })
 
   const ZERO = BigInt(0)
@@ -34,7 +36,7 @@ export function useTokenBalance(token: Token | null, address: `0x${string}` | un
   if (isNative) {
     const raw = ethBalance?.value ?? ZERO
     return {
-      balance:    formatTokenAmount(raw, token.decimals),
+      balance:    ethLoading ? '…' : formatTokenAmount(raw, token.decimals),
       balanceRaw: raw,
       isLoading:  ethLoading,
     }
@@ -42,7 +44,7 @@ export function useTokenBalance(token: Token | null, address: `0x${string}` | un
 
   const raw = (erc20Balance as bigint | undefined) ?? ZERO
   return {
-    balance:    formatTokenAmount(raw, token.decimals),
+    balance:    erc20Loading ? '…' : formatTokenAmount(raw, token.decimals),
     balanceRaw: raw,
     isLoading:  erc20Loading,
   }
