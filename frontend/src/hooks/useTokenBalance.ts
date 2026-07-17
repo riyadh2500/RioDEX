@@ -1,18 +1,15 @@
 'use client'
 
-import { useBalance, useReadContract, useChainId } from 'wagmi'
+import { useBalance, useReadContract } from 'wagmi'
 import { ERC20_ABI } from '@/lib/abis'
 import { isNativeToken, formatTokenAmount } from '@/config/tokens'
 import { Token } from '@/types/token'
-import { DEFAULT_CHAIN_ID } from '@/config/networks'
 
 export function useTokenBalance(token: Token | null, address: `0x${string}` | undefined) {
-  const chainId  = useChainId() ?? DEFAULT_CHAIN_ID
   const isNative = token ? isNativeToken(token.address) : false
 
   const { data: ethBalance, isLoading: ethLoading } = useBalance({
     address,
-    chainId,
     query: { enabled: !!address && isNative, staleTime: 10_000 },
   })
 
