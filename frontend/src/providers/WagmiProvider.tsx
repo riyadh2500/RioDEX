@@ -19,7 +19,7 @@ const config = createConfig({
     injected(),
     ...(projectId ? [walletConnect({ projectId })] : []),
   ],
-  ssr: true,
+  ssr: false,   // DApp — no SSR needed, avoids hydration issues with wallet state
 })
 
 const queryClient = new QueryClient({
