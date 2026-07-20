@@ -10,30 +10,31 @@ export function useTokenBalance(
   address: `0x${string}` | undefined,
 ) {
   const isNative = !!token && isNativeToken(token.address)
-  const isERC20  = !!token && !isNative && !!token.address && token.address.length >= 10 && token.address !== 'native'
+  const isERC20  = !!token && !isNative && !!token.address &&
+                   token.address.length >= 10 && token.address !== 'native'
 
-  // ── Native ETH / chain gas token ─────────────────────────────────────────
-  const { data: ethData, isLoading: ethLoading } = useBalance({
+  const { data: ethData } = useBalance({
     address,
     query: {
       enabled:              !!address && isNative,
-      staleTime:            10_000,
+      staleTime:            30_000,
       refetchOnWindowFocus: true,
       refetchOnMount:       true,
+      retry:                3,
     },
   })
 
-  // ── ERC-20 ────────────────────────────────────────────────────────────────
-  const { data: erc20Data, isLoading: erc20Loading } = useReadContract({
+  const { data: erc20Data } = useReadContract({
     address:      token?.address as `0x${string}`,
     abi:          ERC20_ABI,
     functionName: 'balanceOf',
     args:         address ? [address] : undefined,
     query: {
       enabled:              !!address && isERC20,
-      staleTime:            10_000,
+      staleTime:            30_000,
       refetchOnWindowFocus: true,
       refetchOnMount:       true,
+      retry:                3,
     },
   })
 
@@ -44,20 +45,20 @@ export function useTokenBalance(
   }
 
   if (isNative) {
-    const raw = (ethData?.value) ?? ZERO
+    const raw = ethData?.value ?? ZERO
     return {
-      balance:    ethLoading ? '…' : formatTokenAmount(raw, token.decimals),
+      balance:    formatTokenAmount(raw, token.decimals),
       balanceRaw: raw,
-      isLoading:  ethLoading,
+      isLoading:  false,
     }
   }
 
   if (isERC20) {
     const raw = (erc20Data as bigint | undefined) ?? ZERO
     return {
-      balance:    erc20Loading ? '…' : formatTokenAmount(raw, token.decimals),
+      balance:    formatTokenAmount(raw, token.decimals),
       balanceRaw: raw,
-      isLoading:  erc20Loading,
+      isLoading:  false,
     }
   }
 
