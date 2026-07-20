@@ -6,6 +6,7 @@ import { useContractAddresses } from './useContractAddresses'
 import { isNativeToken, getWETHToken, formatTokenAmount } from '@/config/tokens'
 import { Token } from '@/types/token'
 import { DEFAULT_CHAIN_ID } from '@/config/networks'
+import { useState, useEffect } from 'react'
 
 function resolveAddr(token: Token, chainId: number): `0x${string}` | null {
   if (isNativeToken(token.address)) {
@@ -17,14 +18,9 @@ function resolveAddr(token: Token, chainId: number): `0x${string}` | null {
   return token.address as `0x${string}`
 }
 
-/**
- * Read pair address + reserves for two tokens.
- * Uses individual useReadContract calls (not batched) to avoid
- * wagmi's multicall batching delay that causes stale pairExists=false.
- */
 export function usePairReserves(tokenA: Token | null, tokenB: Token | null) {
-  const chainId                  = useChainId() ?? DEFAULT_CHAIN_ID
-  const { factory, isDeployed }  = useContractAddresses()
+  const chainId                 = useChainId() ?? DEFAULT_CHAIN_ID
+  const { factory, isDeployed } = useContractAddresses()
 
   const ZERO = BigInt(0)
 
@@ -32,44 +28,54 @@ export function usePairReserves(tokenA: Token | null, tokenB: Token | null) {
   const addrB   = tokenB ? resolveAddr(tokenB, chainId) : null
   const enabled = isDeployed && !!factory && !!addrA && !!addrB
 
-  // Step 1 — get pair address
+  // ── Timeout guard — never block UI more than 5 seconds ───────────────────
+  const [timedOut, setTimedOut] = useState(false)
+  useEffect(() => {
+    if (!enabled) { setTimedOut(false); return }
+    setTimedOut(false)
+    const t = setTimeout(() => setTimedOut(true), 5000)
+    return () => clearTimeout(t)
+  }, [enabled, addrA, addrB])
+
+  // Step 1 — pair address
   const { data: pairAddrData, isLoading: pairAddrLoading } = useReadContract({
     address:      factory as `0x${string}`,
     abi:          DEX_FACTORY_ABI,
     functionName: 'getPair',
     args:         enabled ? [addrA!, addrB!] : undefined,
-    query:        { enabled, staleTime: 10_000 },
+    query:        { enabled, staleTime: 10_000, retry: 2 },
   })
 
   const pairAddress = pairAddrData as `0x${string}` | undefined
   const pairExists  = !!pairAddress &&
     pairAddress !== '0x0000000000000000000000000000000000000000'
 
-  // Step 2 — get reserves (only when pair exists)
+  // Step 2 — reserves
   const { data: reservesData, isLoading: reservesLoading } = useReadContract({
     address:      pairAddress,
     abi:          DEX_PAIR_ABI,
     functionName: 'getReserves',
-    query:        { enabled: pairExists, staleTime: 10_000 },
+    query:        { enabled: pairExists, staleTime: 10_000, retry: 2 },
   })
 
-  // Step 3 — get token0 to determine reserve order
-  const { data: token0Data, isLoading: token0Loading } = useReadContract({
+  // Step 3 — token0
+  const { data: token0Data } = useReadContract({
     address:      pairAddress,
     abi:          DEX_PAIR_ABI,
     functionName: 'token0',
-    query:        { enabled: pairExists, staleTime: 60_000 },
+    query:        { enabled: pairExists, staleTime: 60_000, retry: 2 },
   })
 
-  // Step 4 — get totalSupply
-  const { data: totalSupplyData, isLoading: tsLoading } = useReadContract({
+  // Step 4 — totalSupply
+  const { data: totalSupplyData } = useReadContract({
     address:      pairAddress,
     abi:          DEX_PAIR_ABI,
     functionName: 'totalSupply',
-    query:        { enabled: pairExists, staleTime: 10_000 },
+    query:        { enabled: pairExists, staleTime: 10_000, retry: 2 },
   })
 
-  const isLoading = pairAddrLoading || reservesLoading || token0Loading || tsLoading
+  // If timed out or not loading, treat as done
+  const isLoading = !timedOut && (pairAddrLoading || (pairExists && reservesLoading))
 
   if (!pairExists || !reservesData) {
     return {
@@ -89,7 +95,6 @@ export function usePairReserves(tokenA: Token | null, tokenB: Token | null) {
   const token0Addr  = token0Data as `0x${string}` | undefined
   const totalSupply = (totalSupplyData as bigint | undefined) ?? ZERO
 
-  // Sort reserves to match tokenA/tokenB order
   const [reserveA, reserveB] =
     token0Addr && addrA && addrA.toLowerCase() === token0Addr.toLowerCase()
       ? [reserve0Raw, reserve1Raw]

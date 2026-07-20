@@ -230,14 +230,14 @@ function AddLiquidityInner() {
   const approveLoading = approvalA.approveLoading || approvalB.approveLoading
 
   function getButtonState(): { label: string; action: () => void; disabled: boolean; variant: 'pink' | 'amber' | 'muted' } {
-    if (!isConnected)                       return { label: 'Connect Wallet',      action: () => {}, disabled: true,  variant: 'muted' }
-    if (!tokenA || !tokenB)                 return { label: 'Select tokens',       action: () => {}, disabled: true,  variant: 'muted' }
-    if (reservesLoading)                    return { label: 'Loading pool…',       action: () => {}, disabled: true,  variant: 'muted' }
-    if (!amountA || parseFloat(amountA) <=0) return { label: 'Enter Token A amount',action: () => {}, disabled: true, variant: 'muted' }
-    if (!amountB || parseFloat(amountB) <=0) return { label: 'Enter Token B amount',action: () => {}, disabled: true, variant: 'muted' }
-    if (approvalA.needsApproval)             return { label: approvalA.approveLoading ? 'Approving…' : `Approve ${tokenA.symbol}`, action: approvalA.approve, disabled: approvalA.approveLoading, variant: 'amber' }
-    if (approvalB.needsApproval)             return { label: approvalB.approveLoading ? 'Approving…' : `Approve ${tokenB.symbol}`, action: approvalB.approve, disabled: approvalB.approveLoading, variant: 'amber' }
-    if (isSubmitting)                       return { label: 'Adding Liquidity…',   action: () => {}, disabled: true,  variant: 'muted' }
+    if (!isConnected)                         return { label: 'Connect Wallet',       action: () => {}, disabled: true,  variant: 'muted' }
+    if (!tokenA || !tokenB)                   return { label: 'Select tokens',        action: () => {}, disabled: true,  variant: 'muted' }
+    if (!amountA || parseFloat(amountA) <= 0) return { label: 'Enter Token A amount', action: () => {}, disabled: true,  variant: 'muted' }
+    if (!amountB || parseFloat(amountB) <= 0) return { label: 'Enter Token B amount', action: () => {}, disabled: true,  variant: 'muted' }
+    if (reservesLoading)                      return { label: 'Checking pool…',       action: () => {}, disabled: true,  variant: 'muted' }
+    if (approvalA.needsApproval)              return { label: approvalA.approveLoading ? 'Approving…' : `Approve ${tokenA.symbol}`, action: approvalA.approve, disabled: approvalA.approveLoading, variant: 'amber' }
+    if (approvalB.needsApproval)              return { label: approvalB.approveLoading ? 'Approving…' : `Approve ${tokenB.symbol}`, action: approvalB.approve, disabled: approvalB.approveLoading, variant: 'amber' }
+    if (isSubmitting)                         return { label: 'Adding Liquidity…',    action: () => {}, disabled: true,  variant: 'muted' }
     return { label: 'Add Liquidity', action: handleAdd, disabled: false, variant: 'pink' }
   }
 
