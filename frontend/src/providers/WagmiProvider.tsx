@@ -24,7 +24,13 @@ const config = createConfig({
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 15_000, refetchInterval: 15_000, retry: 1 },
+    queries: {
+      staleTime:       20_000,   // 20s — don't refetch too aggressively
+      gcTime:          5 * 60_000, // 5min cache
+      retry:           1,
+      refetchOnWindowFocus: true,
+      // No global refetchInterval — let each query control its own
+    },
   },
 })
 

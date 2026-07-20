@@ -1,52 +1,65 @@
 'use client'
 
-import { useBalance, useReadContract } from 'wagmi'
+import { useBalance, useReadContract, useChainId, useAccount } from 'wagmi'
 import { ERC20_ABI } from '@/lib/abis'
 import { isNativeToken, formatTokenAmount } from '@/config/tokens'
 import { Token } from '@/types/token'
 
 export function useTokenBalance(token: Token | null, address: `0x${string}` | undefined) {
+  const { isConnected } = useAccount()
+  const chainId  = useChainId()
   const isNative = token ? isNativeToken(token.address) : false
 
-  const { data: ethBalance } = useBalance({
+  // Native ETH balance
+  const { data: ethBalance, isLoading: ethLoading } = useBalance({
     address,
     query: {
-      enabled:   !!address && isNative,
-      staleTime: 15_000,
-      // No refetchInterval — only refetch when window focuses or manually triggered
+      enabled:              !!address && !!isConnected && isNative,
+      staleTime:            10_000,
+      refetchOnWindowFocus: true,
     },
   })
 
-  const { data: erc20Balance } = useReadContract({
+  // ERC-20 balance
+  const { data: erc20Balance, isLoading: erc20Loading } = useReadContract({
     address:      token?.address as `0x${string}`,
     abi:          ERC20_ABI,
     functionName: 'balanceOf',
-    args:         address ? [address] : undefined,
+    args:         [address as `0x${string}`],
     query: {
-      enabled:   !!address && !!token && !isNative && !!token.address && token.address.length >= 10,
-      staleTime: 15_000,
+      enabled: (
+        !!address &&
+        !!isConnected &&
+        !!token &&
+        !isNative &&
+        !!token.address &&
+        token.address.length >= 10 &&
+        token.address !== 'native'
+      ),
+      staleTime:            10_000,
+      refetchOnWindowFocus: true,
     },
   })
 
   const ZERO = BigInt(0)
 
-  if (!token || !address) {
+  if (!token || !address || !isConnected) {
     return { balance: '0', balanceRaw: ZERO, isLoading: false }
   }
 
   if (isNative) {
     const raw = ethBalance?.value ?? ZERO
     return {
-      balance:    formatTokenAmount(raw, token.decimals),
+      balance:    ethLoading ? '…' : formatTokenAmount(raw, token.decimals),
       balanceRaw: raw,
-      isLoading:  false,
+      isLoading:  ethLoading,
     }
   }
 
   const raw = (erc20Balance as bigint | undefined) ?? ZERO
   return {
-    balance:    formatTokenAmount(raw, token.decimals),
+    balance:    erc20Loading ? '…' : formatTokenAmount(raw, token.decimals),
     balanceRaw: raw,
-    isLoading:  false,
+    isLoading:  erc20Loading,
   }
 }
