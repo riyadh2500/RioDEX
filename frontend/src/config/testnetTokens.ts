@@ -19,7 +19,7 @@ const SEPOLIA_TOKENS: Token[] = [
     chainId:  11155111,
   },
   {
-    address:  process.env.NEXT_PUBLIC_USDT_SEPOLIA ?? '0x7169D38820dfd117C3FA1f22a697dBA58d90BA06',
+    address:  process.env.NEXT_PUBLIC_USDT_SEPOLIA ?? '0xaA8E23Fb1079EA71e0a56F48a2aA51851D8433D0',
     symbol:   'USDT',
     name:     'Tether USD',
     decimals: 6,
