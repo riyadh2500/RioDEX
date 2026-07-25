@@ -2,6 +2,7 @@
 
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { useEffect } from 'react'
+import { toast } from 'sonner'
 import { ERC20_ABI } from '@/lib/abis'
 
 /**
@@ -30,9 +31,9 @@ export function useApproval(
     useWriteContract({
       mutation: {
         onError: (err: any) => {
-          // bubble the error up — callers can't easily subscribe, so we rethrow
-          // so toast in the swap page onError fires. Callers may also add their own.
-          console.error('[useApproval] approve failed:', err?.shortMessage ?? err?.message)
+          const msg = err?.shortMessage ?? err?.message ?? 'Approval failed'
+          toast.error('Approval failed', { description: msg })
+          console.error('[useApproval]', msg)
         },
       },
     })

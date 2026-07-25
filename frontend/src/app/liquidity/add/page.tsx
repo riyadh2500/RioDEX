@@ -234,7 +234,7 @@ function AddLiquidityInner() {
     if (!tokenA || !tokenB)                   return { label: 'Select tokens',        action: () => {}, disabled: true,  variant: 'muted' }
     if (!amountA || parseFloat(amountA) <= 0) return { label: 'Enter Token A amount', action: () => {}, disabled: true,  variant: 'muted' }
     if (!amountB || parseFloat(amountB) <= 0) return { label: 'Enter Token B amount', action: () => {}, disabled: true,  variant: 'muted' }
-    if (reservesLoading)                      return { label: 'Checking pool…',       action: () => {}, disabled: true,  variant: 'muted' }
+    // Note: don't block on reservesLoading — user can add even while pool check is running
     if (approvalA.needsApproval)              return { label: approvalA.approveLoading ? 'Approving…' : `Approve ${tokenA.symbol}`, action: approvalA.approve, disabled: approvalA.approveLoading, variant: 'amber' }
     if (approvalB.needsApproval)              return { label: approvalB.approveLoading ? 'Approving…' : `Approve ${tokenB.symbol}`, action: approvalB.approve, disabled: approvalB.approveLoading, variant: 'amber' }
     if (isSubmitting)                         return { label: 'Adding Liquidity…',    action: () => {}, disabled: true,  variant: 'muted' }
