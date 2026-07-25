@@ -1,6 +1,10 @@
 import { Token } from '@/types/token'
 
 // ── Ethereum Sepolia (chainId 11155111) ───────────────────────────────────────
+// Addresses are hardcoded — do NOT use process.env here.
+// process.env is evaluated at build time for NEXT_PUBLIC_ vars, but if the
+// build runs before env vars are set in Vercel, the fallback is used instead.
+// Hardcoding ensures the correct address is always used regardless of env state.
 const SEPOLIA_TOKENS: Token[] = [
   {
     address:  'native',
@@ -11,7 +15,7 @@ const SEPOLIA_TOKENS: Token[] = [
     chainId:  11155111,
   },
   {
-    address:  process.env.NEXT_PUBLIC_USDC_SEPOLIA ?? '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
+    address:  '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',  // Circle USDC on Sepolia
     symbol:   'USDC',
     name:     'USD Coin',
     decimals: 6,
@@ -19,7 +23,7 @@ const SEPOLIA_TOKENS: Token[] = [
     chainId:  11155111,
   },
   {
-    address:  process.env.NEXT_PUBLIC_USDT_SEPOLIA ?? '0xaA8E23Fb1079EA71e0a56F48a2aA51851D8433D0',
+    address:  '0xaA8E23Fb1079EA71e0a56F48a2aA51851D8433D0',  // USDT on Sepolia
     symbol:   'USDT',
     name:     'Tether USD',
     decimals: 6,
@@ -39,7 +43,7 @@ const BASE_SEPOLIA_TOKENS: Token[] = [
     chainId:  84532,
   },
   {
-    address:  process.env.NEXT_PUBLIC_USDC_BASE_SEPOLIA ?? '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+    address:  '0x036CbD53842c5426634e7929541eC2318f3dCF7e',  // Circle USDC on Base Sepolia
     symbol:   'USDC',
     name:     'USD Coin',
     decimals: 6,
@@ -47,7 +51,7 @@ const BASE_SEPOLIA_TOKENS: Token[] = [
     chainId:  84532,
   },
   {
-    address:  process.env.NEXT_PUBLIC_USDT_BASE_SEPOLIA ?? '0x323e78f944A9a1FcF3a10efcC5319DBb0bB6e673',
+    address:  '0x323e78f944A9a1FcF3a10efcC5319DBb0bB6e673',  // USDT on Base Sepolia
     symbol:   'USDT',
     name:     'Tether USD',
     decimals: 6,
