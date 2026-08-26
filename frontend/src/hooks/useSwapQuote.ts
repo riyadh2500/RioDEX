@@ -22,22 +22,34 @@ function resolveAddress(token: Token, chainId: number): `0x${string}` | null {
 }
 
 /**
- * Any contract revert from getAmountsOut means no usable liquidity:
- * the pair either doesn't exist or has zero reserves.
+ * Only treat Solidity contract reverts as "no liquidity".
+ * Network errors, timeouts, RPC failures must NOT be classified as no liquidity.
  */
 function isLiquidityError(err: unknown): boolean {
   if (!err) return false
   const name = (err as any)?.name ?? ''
   const msg  = (err as any)?.message ?? ''
-  // viem typed errors
-  if (name === 'ContractFunctionRevertedError')   return true
-  if (name === 'ContractFunctionExecutionError')  return true
-  // message-based fallbacks
+
+  // viem ContractFunctionRevertedError = actual Solidity revert from the contract
+  if (name === 'ContractFunctionRevertedError') return true
+
+  // ContractFunctionExecutionError wraps a revert — check the cause
+  if (name === 'ContractFunctionExecutionError') {
+    const cause = (err as any)?.cause
+    if (cause?.name === 'ContractFunctionRevertedError') return true
+    // Only treat as liquidity error if message mentions DEX-specific strings
+    const causeName = cause?.name ?? ''
+    if (causeName === 'ContractFunctionRevertedError') return true
+  }
+
+  // Message-based — only match specific DEX revert strings, NOT generic network errors
   const lower = msg.toLowerCase()
-  if (lower.includes('revert'))                   return true
-  if (lower.includes('insufficient_liquidity'))   return true
-  if (lower.includes('pair_not_found'))           return true
-  if (lower.includes('invalid_path'))             return true
+  if (lower.includes('insufficient_liquidity'))  return true
+  if (lower.includes('pair_not_found'))          return true
+  if (lower.includes('invalid_path'))            return true
+  if (lower.includes('execution reverted'))      return true
+
+  // Do NOT match 'revert' alone — too broad, catches network/RPC errors
   return false
 }
 
@@ -73,7 +85,7 @@ export function useSwapQuote(
     abi:          DEX_ROUTER_ABI,
     functionName: 'getAmountsOut',
     args:         enabled ? [amountInRaw, [addrIn!, addrOut!]] : undefined,
-    query: { enabled, retry: false },
+    query: { enabled, retry: 2 },
   })
 
   // Not deployed on this chain at all
@@ -81,7 +93,7 @@ export function useSwapQuote(
     return { amountOut: '', amountOutRaw: ZERO, isLoading: false, notDeployed: true, noLiquidity: false, error: null }
   }
 
-  // Any revert from getAmountsOut = no liquidity / no pair
+  // Contract revert = no liquidity. Everything else = real error to surface.
   if (error) {
     const noLiq = isLiquidityError(error)
     return {
@@ -90,7 +102,7 @@ export function useSwapQuote(
       isLoading:    false,
       notDeployed:  false,
       noLiquidity:  noLiq,
-      error:        noLiq ? null : error,   // only surface non-liquidity errors
+      error:        noLiq ? null : error,
     }
   }
 
