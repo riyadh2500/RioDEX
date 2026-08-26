@@ -1,9 +1,26 @@
 import { NetworkConfig } from '@/types/chain'
 
 // Contract addresses are hardcoded — do NOT use process.env here.
-// NEXT_PUBLIC_ vars are build-time only. If Vercel builds before env vars
-// are configured in the dashboard, fallbacks are used instead.
-// Hardcoding guarantees the correct addresses regardless of build order.
+
+// ─── Localhost / Hardhat (chainId 31337) ──────────────────────────────────────
+const localhost: NetworkConfig = {
+  chainId:     31337,
+  name:        'Localhost',
+  shortName:   'LOCAL',
+  rpcUrl:      'http://127.0.0.1:8545',
+  explorerUrl: 'http://localhost:8545',
+  logoUrl:     '/tokens/eth.svg',
+  nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+  contracts: {
+    factory:      '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512',
+    router:       '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0',
+    tokenFactory: '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9',
+    weth:         '0x5FbDB2315678afecb367f032d93F642f64180aa3',
+  },
+  nativeUSDPrice:    1,
+  testnet:           true,
+  nativeCoinGeckoId: 'ethereum',
+}
 
 // ─── Ethereum Sepolia ─────────────────────────────────────────────────────────
 const ethereumSepolia: NetworkConfig = {
@@ -47,6 +64,7 @@ const baseSepolia: NetworkConfig = {
 
 // ─── Registry ─────────────────────────────────────────────────────────────────
 export const NETWORKS: Record<number, NetworkConfig> = {
+  31337:    localhost,
   11155111: ethereumSepolia,
   84532:    baseSepolia,
 }

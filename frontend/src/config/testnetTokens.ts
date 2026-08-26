@@ -1,5 +1,33 @@
 import { Token } from '@/types/token'
 
+// ── Localhost / Hardhat (chainId 31337) ───────────────────────────────────────
+const LOCALHOST_TOKENS: Token[] = [
+  {
+    address:  'native',
+    symbol:   'ETH',
+    name:     'Ether',
+    decimals: 18,
+    logoURI:  '/tokens/eth.svg',
+    chainId:  31337,
+  },
+  {
+    address:  '0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6',  // MockUSDC
+    symbol:   'USDC',
+    name:     'USD Coin',
+    decimals: 6,
+    logoURI:  '/tokens/usdc.svg',
+    chainId:  31337,
+  },
+  {
+    address:  '0x8A791620dd6260079BF849Dc5567aDC3F2FdC318',  // MockUSDT
+    symbol:   'USDT',
+    name:     'Tether USD',
+    decimals: 6,
+    logoURI:  '/tokens/usdt.svg',
+    chainId:  31337,
+  },
+]
+
 // ── Ethereum Sepolia (chainId 11155111) ───────────────────────────────────────
 // Addresses are hardcoded — do NOT use process.env here.
 // process.env is evaluated at build time for NEXT_PUBLIC_ vars, but if the
@@ -62,6 +90,7 @@ const BASE_SEPOLIA_TOKENS: Token[] = [
 
 // ─── Master registry ──────────────────────────────────────────────────────────
 export const TESTNET_TOKENS: Record<number, Token[]> = {
+  31337:    LOCALHOST_TOKENS,
   11155111: SEPOLIA_TOKENS,
   84532:    BASE_SEPOLIA_TOKENS,
 }
